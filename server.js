@@ -35,6 +35,7 @@ app.prepare().then(() => {
       scopes: ["write_orders", "read_orders", "read_customers"],
       async afterAuth(ctx) {
         const { shop, accessToken } = ctx.session;
+        console.log("API KEY",this.apiKey)
         ctx.cookies.set("shopOrigin", shop, {
           httpOnly: false,
           secure: true,
