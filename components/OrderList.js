@@ -21,14 +21,15 @@ import { getFirestore } from "../firebase";
 const GET_ORDERS = gql`
   query getOrders {
     orders(
-      first: 30
+      first: 100
       reverse: true
-      query: "displayFinancialStatus:PAID AND tag:'CARG_PENDIENTE'"
+      query: "displayFinancialStatus:'PAID' AND tag:'CARG_PENDIENTE'"
     ) {
       edges {
         node {
           id
           name
+          subtotalPrice
           createdAt
           customer {
             displayName
@@ -37,7 +38,6 @@ const GET_ORDERS = gql`
           displayFinancialStatus
           displayFulfillmentStatus
           shippingAddress {
-            id
             name
             address1
             address2
@@ -83,12 +83,12 @@ function OrderList() {
   const app = useContext(Context);
   const [shipdata, setShipdata] = useContext(UserContext);
   const [orderlist, setOrderlist] = useState([]);
-  const [load, setLoad] = useState(false)
+  const [load, setLoad] = useState(false);
 
   const { loading, error, data } = useQuery(GET_ORDERS);
   const [removeTag] = useMutation(REMOVE_TAGS);
   const [addTag] = useMutation(ADD_TAGS);
-  
+
   const db = getFirestore();
 
   useEffect(() => {
@@ -114,8 +114,8 @@ function OrderList() {
 
   const redirectToOrder = () => {
     const redirect = Redirect.create(app);
-    redirect.dispatch(Redirect.Action.APP, "/edit-shipping")
-    setLoad(false)
+    redirect.dispatch(Redirect.Action.APP, "/edit-shipping");
+    setLoad(false);
   };
 
   const exportToCsv = () => {
@@ -188,7 +188,7 @@ function OrderList() {
         <Stack>
           <Stack.Item fill>
             <TextStyle variation="subdued">
-              {orderlist.length} pedidos para enviar por Correo Argentino
+              {orderlist.length} pedidos para enviar por Correo Argentino.
             </TextStyle>
           </Stack.Item>
           <Stack.Item>
@@ -208,6 +208,7 @@ function OrderList() {
             const {
               name,
               rotulo,
+              subtotalPrice,
               customer,
               shippingAddress,
               displayFinancialStatus,

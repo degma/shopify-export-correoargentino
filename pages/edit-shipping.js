@@ -42,7 +42,7 @@ const EditShippingAddress = () => {
     cel: "",
   });
 
-  const { name, customer, shippingAddress } = shipdata.selected;
+  const { name, subtotalPrice, customer, shippingAddress } = shipdata.selected;
 
   const handleChange = (value, id) => {
     const field = id;
@@ -69,12 +69,19 @@ const EditShippingAddress = () => {
         if (doc.exists) {
           setForm(doc.data());
         } else {
-          const cliente = removeAcentos(customer.displayName);
+          const subTotalAmmount = subtotalPrice.substring(
+            0,
+            subtotalPrice.length - 3
+          );
+          const cliente = removeAcentos(shippingAddress.name);
           const localidad = removeAcentos(shippingAddress.city);
           const calle = removeAcentos(
             `${shippingAddress.address1} ${shippingAddress.address2}`
           );
-          const fullcel = removeAcentos(shippingAddress.phone);
+          const fullcel = removeAcentos(shippingAddress.phone).replace(
+            / /g,
+            ""
+          );
           const cel = fullcel.substr(-8);
           const codAreaCel = fullcel.substring(0, fullcel.length - 8);
 
@@ -84,7 +91,7 @@ const EditShippingAddress = () => {
             ancho: "30",
             alto: "30",
             peso: "1",
-            valor: "3500",
+            valor: subTotalAmmount,
             provincia: shippingAddress.provinceCode,
             sucursal: "",
             localidad: localidad,
