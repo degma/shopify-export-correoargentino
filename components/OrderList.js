@@ -20,11 +20,7 @@ import { getFirestore } from "../firebase";
 
 const GET_ORDERS = gql`
   query getOrders {
-    orders(
-      first: 100
-      reverse: true
-      query: "displayFinancialStatus:'PAID' AND tag:'CARG_PENDIENTE'"
-    ) {
+    orders(first: 150, query: "tag:CARG_PENDIENTE financial_status:paid") {
       edges {
         node {
           id

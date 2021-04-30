@@ -27,7 +27,7 @@
     "@shopify/koa-shopify-auth": "^3.2.0",
     "@shopify/koa-shopify-graphql-proxy": "^4.1.0",
     "@shopify/koa-shopify-webhooks": "^2.6.0",
-    "@shopify/polaris": "^5.15.0",
+    "@shopify/polaris": "latest",
     "apollo-boost": "^0.4.9",
     "dotenv": "^8.2.0",
     "firebase": "^8.3.2",
@@ -42,7 +42,8 @@
     "react": "^16.14.0",
     "react-dom": "^16.14.0",
     "store-js": "^2.0.4",
-    "webpack": "^5.30.0"
+    "webpack": "^5.30.0",
+    "xlsx": "^0.16.9"
   },
   "devDependencies": {
     "eslint": "^5.16.0",
