@@ -8,42 +8,66 @@ import {
   Card,
   Stack,
   Badge,
-  IndexTable,
-  useIndexResourceState,
+  Button,
+  Caption,
 } from "@shopify/polaris";
 import * as XLSX from "xlsx";
 
-const GET_ORDERS = gql`
-query getOrders {
-  orders(first: 150, query: "tag:CARG_ETIQUETA fulfillment_status:fulfilled") {
-    edges {
-      node {
+import { ADD_TAGS, REMOVE_TAGS } from "../utils/mutations";
+
+const UPDATE_TRACKING_INFO = gql`
+  mutation fulfillmentTrackingInfoUpdateV2(
+    $fulfillmentId: ID!
+    $trackingInfoInput: FulfillmentTrackingInput!
+  ) {
+    fulfillmentTrackingInfoUpdateV2(
+      fulfillmentId: $fulfillmentId
+      trackingInfoInput: $trackingInfoInput
+    ) {
+      fulfillment {
         id
-        name
-        subtotalPrice
-        createdAt
-        fulfillments {
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+const GET_ORDERS = gql`
+  query getOrders {
+    orders(
+      first: 150
+      query: "tag:CARG_ETIQUETA fulfillment_status:fulfilled"
+    ) {
+      edges {
+        node {
           id
-        }
-        displayFulfillmentStatus
-        customer {
-          displayName
-          email
-        }
-        shippingAddress {
           name
-          address1
-          address2
-          city
-          zip
-          phone
-          provinceCode
-          province
+          subtotalPrice
+          createdAt
+          fulfillments {
+            id
+          }
+          displayFulfillmentStatus
+          customer {
+            displayName
+            email
+          }
+          shippingAddress {
+            name
+            address1
+            address2
+            city
+            zip
+            phone
+            provinceCode
+            province
+          }
         }
       }
     }
   }
-}
 `;
 
 const EditTrackingInfo = () => {
@@ -52,6 +76,9 @@ const EditTrackingInfo = () => {
   const [shippingData, setShippingData] = useState([]);
   const [ordersData, setOrdersData] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
+  const [fulfillmentTrackingInfoUpdateV2] = useMutation(UPDATE_TRACKING_INFO);
+  const [removeTag] = useMutation(REMOVE_TAGS);
+  const [addTag] = useMutation(ADD_TAGS);
 
   useEffect(() => {
     setOrdersData([]);
@@ -60,7 +87,7 @@ const EditTrackingInfo = () => {
         return {
           id: order.id,
           pedido: order.name,
-          fulfillmentId: order.fulfillments ? order.fulfillments.id : "",
+          fulfillmentId: order.fulfillments[0] ? order.fulfillments[0].id : "",
           customer: order.shippingAddress ? order.shippingAddress.name : "",
           fulfillmentStatus: order.displayFulfillmentStatus,
         };
@@ -121,8 +148,8 @@ const EditTrackingInfo = () => {
         if (`#${envio.pedido}` === order.pedido) {
           console.log("ENCONTRADO");
           let updatedOrder = order;
-          updatedOrder.tn = envio.TN;
-          updatedOrder.estado = envio.Estado;
+          updatedOrder.tn = envio.TN.replace(/\s/g, "");
+          updatedOrder.estado = envio.Estado.replace(/\s+$/, "");
           console.log(index, updatedOrder);
         }
       });
@@ -152,38 +179,58 @@ const EditTrackingInfo = () => {
     plural: "envios",
   };
 
-  const {
-    selectedResources,
-    allResourcesSelected,
-    handleSelectionChange,
-  } = useIndexResourceState(shippingData);
-
-  const rowMarkup = shippingData.map(
-    ({ pedido, TN, Fecha, Estado, Destino }, index) => (
-      <IndexTable.Row
-        id={pedido}
-        key={TN}
-        selected={selectedResources.includes(pedido)}
-        position={index}
-      >
-        <IndexTable.Cell>
-          <TextStyle variation="strong">{pedido}</TextStyle>
-        </IndexTable.Cell>
-        <IndexTable.Cell>{TN}</IndexTable.Cell>
-        <IndexTable.Cell>{Estado}</IndexTable.Cell>
-        <IndexTable.Cell>{Destino}</IndexTable.Cell>
-      </IndexTable.Row>
-    )
-  );
+  const updateTrackingInfo = () => {
+    ordersData
+      .filter(
+        (order) =>
+          order.tn &&
+          !order.estado.includes("PREIMPOSICION") &&
+          order.fulfillmentId
+      )
+      .forEach((order, index) => {
+        console.log("calling", order.fulfillmentId);
+        fulfillmentTrackingInfoUpdateV2({
+          variables: {
+            fulfillmentId: order.fulfillmentId,
+            notifyCustomer: true,
+            trackingInfoInput: {
+              url: "https://www.correoargentino.com.ar/formularios/e-commerce",
+              number: order.tn,
+            },
+          },
+        })
+          .then((res) => {
+            addTag({ variables: { id: order.id, tags: "CARG_ENVIADO" } });
+            removeTag({ variables: { id: order.id, tags: "CARG_ETIQUETA" } });
+          })
+          .catch((err) => console.error(err));
+      });
+  };
 
   return (
     <Page title="Actualizar información de Envíos">
       <Card>
-        <input
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          onChange={handleFileUpload}
-        />
+        <Card.Section>
+          <Stack>
+            <Stack.Item fill>
+              <TextStyle variation="subdued">
+                {ordersData.length} pedidos para enviar por Correo Argentino.
+              </TextStyle>
+            </Stack.Item>
+            <Stack.Item>
+              <Button primary onClick={updateTrackingInfo}>
+                Actualizar Tracking Info
+              </Button>
+            </Stack.Item>
+          </Stack>
+        </Card.Section>
+        <Card.Section>
+          <input
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={handleFileUpload}
+          />
+        </Card.Section>
       </Card>
       <Card>
         <ResourceList
@@ -208,6 +255,7 @@ function renderItem(item, _, index) {
     fulfillmentStatus,
     estado,
     tn,
+    tnStatus,
   } = item;
 
   return (
@@ -219,21 +267,29 @@ function renderItem(item, _, index) {
       <Stack>
         <Stack.Item fill>
           <h3>
-            <TextStyle variation="strong">{pedido}</TextStyle>
+            <TextStyle variation="strong">
+              Pedido {pedido} - {customer}
+            </TextStyle>
           </h3>
-          <div>{customer}</div>
+
+          <Caption>
+            <Badge
+              size="small"
+              status={fulfillmentStatus == "FULFILLED" ? "success" : "warning"}
+            >
+              {fulfillmentStatus.toLowerCase()}
+            </Badge>
+            {tn ? `TN:${tn} (${estado})` : ""}
+          </Caption>
         </Stack.Item>
         <Stack.Item>
-          <TextStyle variation="strong">{tn}</TextStyle>
-          <div>{estado}</div>
-        </Stack.Item>
-        <Stack.Item>
-          <Badge
-            size="small"
-            status={fulfillmentStatus == "FULFILLED" ? "success" : "warning"}
-          >
-            {fulfillmentStatus.toLowerCase()}
-          </Badge>
+          {tnStatus ? (
+            <Badge size="small" status="success">
+              Actualizado
+            </Badge>
+          ) : (
+            ""
+          )}
         </Stack.Item>
       </Stack>
     </ResourceItem>

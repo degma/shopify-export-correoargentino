@@ -32,7 +32,7 @@ app.prepare().then(() => {
     createShopifyAuth({
       apiKey: SHOPIFY_API_KEY,
       secret: SHOPIFY_API_SECRET_KEY,
-      scopes: ["write_orders", "read_orders", "read_customers"],
+      scopes: ["write_orders", "read_orders", "read_customers", "write_merchant_managed_fulfillment_orders"],
       async afterAuth(ctx) {
         const { shop, accessToken } = ctx.session;
         console.log("API KEY",this.apiKey)
