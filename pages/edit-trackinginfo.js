@@ -10,6 +10,7 @@ import {
   Badge,
   Button,
   Caption,
+  ProgressBar,
 } from "@shopify/polaris";
 import * as XLSX from "xlsx";
 
@@ -38,7 +39,8 @@ const GET_ORDERS = gql`
   query getOrders {
     orders(
       first: 150
-      query: "tag:CARG_ETIQUETA fulfillment_status:fulfilled"
+      reverse: true
+      query: "-fulfillment_status:unfulfilled AND financial_status:paid AND tag:CARG_ETIQUETA"
     ) {
       edges {
         node {
@@ -210,6 +212,7 @@ const EditTrackingInfo = () => {
   return (
     <Page title="Actualizar información de Envíos">
       <Card>
+      <ProgressBar progress={0} size="small" />
         <Card.Section>
           <Stack>
             <Stack.Item fill>
