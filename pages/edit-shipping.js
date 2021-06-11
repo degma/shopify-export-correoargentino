@@ -7,6 +7,7 @@ import {
   TextField,
   Stack,
   Button,
+  InlineError
 } from "@shopify/polaris";
 import { useEffect, useState, useCallback, useContext } from "react";
 import { Redirect } from "@shopify/app-bridge/actions";
@@ -110,10 +111,6 @@ const EditShippingAddress = () => {
         }
       });
   }, []);
-
-  useEffect(() => {
-    console.log(form);
-  }, [form]);
 
   const redirectToMain = () => {
     const redirect = Redirect.create(app);

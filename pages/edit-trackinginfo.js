@@ -1,5 +1,5 @@
-import { useQuery, gql, useMutation } from "@apollo/client";
-import { useEffect, useState, useCallback } from "react";
+import { useQuery, useMutation } from "@apollo/client";
+import { useEffect, useState } from "react";
 import {
   Page,
   TextStyle,
@@ -10,70 +10,18 @@ import {
   Badge,
   Button,
   Caption,
-  ProgressBar,
+  Banner,
 } from "@shopify/polaris";
 import * as XLSX from "xlsx";
-
-import { ADD_TAGS, REMOVE_TAGS } from "../utils/mutations";
-
-const UPDATE_TRACKING_INFO = gql`
-  mutation fulfillmentTrackingInfoUpdateV2(
-    $fulfillmentId: ID!
-    $trackingInfoInput: FulfillmentTrackingInput!
-  ) {
-    fulfillmentTrackingInfoUpdateV2(
-      fulfillmentId: $fulfillmentId
-      trackingInfoInput: $trackingInfoInput
-    ) {
-      fulfillment {
-        id
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-const GET_ORDERS = gql`
-  query getOrders {
-    orders(
-      first: 150
-      reverse: true
-      query: "-fulfillment_status:unfulfilled AND financial_status:paid AND tag:CARG_ETIQUETA"
-    ) {
-      edges {
-        node {
-          id
-          name
-          subtotalPrice
-          createdAt
-          fulfillments {
-            id
-          }
-          displayFulfillmentStatus
-          customer {
-            displayName
-            email
-          }
-          shippingAddress {
-            name
-            address1
-            address2
-            city
-            zip
-            phone
-            provinceCode
-            province
-          }
-        }
-      }
-    }
-  }
-`;
+import {
+  ADD_TAGS,
+  REMOVE_TAGS,
+  UPDATE_TRACKING_INFO,
+} from "../utils/mutations";
+import { GET_ORDERS_ETIQUETA } from "../utils/queries";
 
 const EditTrackingInfo = () => {
-  const { loading, error, data } = useQuery(GET_ORDERS);
+  const { loading, error, data } = useQuery(GET_ORDERS_ETIQUETA);
   const [columns, setColumns] = useState([]);
   const [shippingData, setShippingData] = useState([]);
   const [ordersData, setOrdersData] = useState([]);
@@ -81,6 +29,7 @@ const EditTrackingInfo = () => {
   const [fulfillmentTrackingInfoUpdateV2] = useMutation(UPDATE_TRACKING_INFO);
   const [removeTag] = useMutation(REMOVE_TAGS);
   const [addTag] = useMutation(ADD_TAGS);
+  const [updatedOrders, setUpdatedOrders] = useState([]);
 
   useEffect(() => {
     setOrdersData([]);
@@ -123,8 +72,6 @@ const EditTrackingInfo = () => {
             obj[headers[j]] = d;
           }
         }
-
-        // remove the blank rows
         if (Object.values(obj).filter((x) => x).length > 0) {
           obj.pedido = obj.Destino.split("PEDIDO")[1];
           obj.TN = obj.TN.replace(" ", "");
@@ -144,15 +91,12 @@ const EditTrackingInfo = () => {
   };
 
   useEffect(() => {
-    console.log("Buscando...");
-    ordersData.forEach((order, index) => {
+    ordersData.forEach((order) => {
       shippingData.forEach((envio) => {
         if (`#${envio.pedido}` === order.pedido) {
-          console.log("ENCONTRADO");
           let updatedOrder = order;
           updatedOrder.tn = envio.TN.replace(/\s/g, "");
           updatedOrder.estado = envio.Estado.replace(/\s+$/, "");
-          console.log(index, updatedOrder);
         }
       });
     });
@@ -187,10 +131,10 @@ const EditTrackingInfo = () => {
         (order) =>
           order.tn &&
           !order.estado.includes("PREIMPOSICION") &&
+          !order.estado.includes("CANCELADA") &&
           order.fulfillmentId
       )
-      .forEach((order, index) => {
-        console.log("calling", order.fulfillmentId);
+      .forEach((order) => {
         fulfillmentTrackingInfoUpdateV2({
           variables: {
             fulfillmentId: order.fulfillmentId,
@@ -201,18 +145,47 @@ const EditTrackingInfo = () => {
             },
           },
         })
-          .then((res) => {
-            addTag({ variables: { id: order.id, tags: "CARG_ENVIADO" } });
-            removeTag({ variables: { id: order.id, tags: "CARG_ETIQUETA" } });
+          .then(() => {
+            addTag({ variables: { id: order.id, tags: "CARG_ENVIADO" } }).then(
+              () => {
+                removeTag({
+                  variables: { id: order.id, tags: "CARG_ETIQUETA" },
+                }).then(() => {
+                  setUpdatedOrders((oldArray) => [...oldArray, order.pedido]);
+                });
+              }
+            );
           })
           .catch((err) => console.error(err));
       });
   };
 
+  useEffect(() => {
+    if (ordersData) {
+      console.log(ordersData);
+      const arr = ordersData.filter((i) => !updatedOrders.includes(i.pedido));
+      console.log("ARRAY", arr);
+      setOrdersData(arr);
+    }
+    console.log(updatedOrders);
+  }, [updatedOrders]);
+
   return (
     <Page title="Actualizar información de Envíos">
+      {updatedOrders.length > 0 ? (
+        <div className="banner-space">
+          <Banner
+            title={`Se actualizaron ${updatedOrders.length} envíos.`}
+            status="success"
+            onDismiss={() => {
+              setUpdatedOrders([]);
+            }}
+          />
+        </div>
+      ) : (
+        ""
+      )}
       <Card>
-      <ProgressBar progress={0} size="small" />
         <Card.Section>
           <Stack>
             <Stack.Item fill>
@@ -221,7 +194,16 @@ const EditTrackingInfo = () => {
               </TextStyle>
             </Stack.Item>
             <Stack.Item>
-              <Button primary onClick={updateTrackingInfo}>
+              <Button
+                primary
+                onClick={updateTrackingInfo}
+                disabled={
+                  (ordersData.length > 0 && shippingData.length > 0) ||
+                  updatedOrders > 0
+                    ? false
+                    : true
+                }
+              >
                 Actualizar Tracking Info
               </Button>
             </Stack.Item>

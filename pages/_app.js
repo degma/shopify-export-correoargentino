@@ -14,6 +14,7 @@ import {
 } from "@apollo/client";
 import UserContext from "../components/UserContext";
 import { useState } from "react";
+import "./OrderList.css"
 
 const client = new ApolloClient({
   link: new createHttpLink({
